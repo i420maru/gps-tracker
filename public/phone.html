@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- スマホ表示の最適化。ユーザーがピンチズームできないようにする -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>GPS送信</title>
+</head>
+<body>
+
+  <h1>📡 GPS送信</h1>
+
+  <!-- デバイス名の入力欄（複数スマホを区別するため） -->
+  <input type="text" id="deviceName" placeholder="デバイス名（例: 田中のスマホ）">
+
+  <!-- 開始・停止ボタン -->
+  <button id="startBtn" onclick="startTracking()">送信開始</button>
+  <button id="stopBtn"  onclick="stopTracking()" style="display:none;">送信停止</button>
+
+  <!-- 状態表示エリア -->
+  <p>GPS: <span id="gpsStatus">待機中</span></p>
+  <p>サーバー: <span id="wsStatus">未接続</span></p>
+  <p>送信回数: <span id="sendCount">0</span></p>
+
+  <script>
+
+    // ===== 変数の定義 =====
+    let ws        = null; // WebSocket の接続オブジェクト
+    let watchId   = null; // GPS監視のID（停止するときに使う）
+    let sendCount = 0;    // 送信回数のカウンター
+    let lastPosition = null; // 最後に取得した位置情報を保持しておく
+
+    // 送信間隔（ミリ秒）。5000 = 5秒ごとに送信
+    const SEND_INTERVAL = 5000;
+    let sendTimer = null; // setInterval のID（停止するときに使う）
+
+    // デバイスIDを取得する（なければ生成してlocalStorageに保存）
+    function getDeviceId() {
+      let id = localStorage.getItem('deviceId');
+      if (!id) {
+        // ランダムな8文字の文字列を生成
+        id = 'device_' + Math.random().toString(36).substr(2, 8);
+        localStorage.setItem('deviceId', id);
+      }
+      return id;
+    }
+
+    // 「送信開始」ボタンを押したときに呼ばれる
+    async function startTracking() {
+
+      // GPS が使えるブラウザか確認
+      if (!navigator.geolocation) {
+        alert('このブラウザはGPSに対応していません');
+        return;
+      }
+
+      // ボタンを無効化（二重押し防止）
+      document.getElementById('startBtn').disabled = true;
+
+      // WebSocket でサーバーに接続する
+      // http → ws、https → wss に自動で切り替える
+      const wsUrl = location.protocol === 'https:'
+        ? `wss://${location.host}`
+        : `ws://${location.host}`;
+
+      document.getElementById('wsStatus').textContent = '接続中...';
+      ws = new WebSocket(wsUrl);
+
+      // 接続が確立したら GPS 監視を開始する（Promise で「接続完了まで待つ」）
+      await new Promise((resolve, reject) => {
+        ws.onopen  = () => { document.getElementById('wsStatus').textContent = '接続済み'; resolve(); };
+        ws.onerror = () => { document.getElementById('wsStatus').textContent = '接続失敗'; reject(); };
+      });
+
+      // GPS の監視を開始する（位置が変わるたびに lastPosition を更新）
+      document.getElementById('gpsStatus').textContent = '取得中...';
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          // 取得成功したら lastPosition に保存しておく
+          lastPosition = position;
+          document.getElementById('gpsStatus').textContent = '取得成功';
+        },
+        (error) => {
+          document.getElementById('gpsStatus').textContent = 'エラー: ' + error.message;
+        },
+        { enableHighAccuracy: true, maximumAge: 0 } // 高精度GPS・キャッシュ不使用
+      );
+
+      // 5秒ごとに lastPosition をサーバーへ送信する
+      sendTimer = setInterval(() => {
+        if (lastPosition && ws.readyState === WebSocket.OPEN) {
+          const { latitude, longitude, accuracy } = lastPosition.coords;
+          ws.send(JSON.stringify({
+            type:       'location',
+            deviceId:   getDeviceId(),
+            deviceName: document.getElementById('deviceName').value || 'スマホ',
+            lat:        latitude,
+            lng:        longitude,
+            accuracy:   accuracy,
+            timestamp:  new Date().toISOString()
+          }));
+          sendCount++;
+          document.getElementById('sendCount').textContent = sendCount;
+        }
+      }, SEND_INTERVAL);
+
+      // ボタンの表示を切り替える
+      document.getElementById('startBtn').style.display = 'none';
+      document.getElementById('stopBtn').style.display  = 'inline';
+
+    } 
+
+    // 「送信停止」ボタンを押したときに呼ばれる
+    function stopTracking() {
+
+      // GPS の監視を止める
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+
+      // 定期送信のタイマーを止める
+      if (sendTimer !== null) {
+        clearInterval(sendTimer);
+        sendTimer = null;
+      }
+
+      // WebSocket の接続を切る
+      if (ws !== null) {
+        ws.close();
+        ws = null;
+      }
+
+      // 画面の表示をリセットする
+      document.getElementById('gpsStatus').textContent = '待機中';
+      document.getElementById('wsStatus').textContent  = '未接続';
+      document.getElementById('sendCount').textContent = '0';
+      sendCount = 0;
+      lastPosition = null;
+
+      // ボタンの表示を切り替える
+      document.getElementById('startBtn').style.display   = 'inline';
+      document.getElementById('startBtn').disabled        = false;
+      document.getElementById('stopBtn').style.display    = 'none';
+
+    }
+
+  </script>
+
+</body>
+</html>

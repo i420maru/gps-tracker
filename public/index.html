@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPS地図</title>
+
+  <!-- Leaflet.js の CSS（地図の見た目） CDN から読み込む -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    /* ページ全体の余白をなくす */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* 地図を画面いっぱいに表示する */
+    #map { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+
+  <!-- 地図を表示する div。Leaflet はここに地図を描画する -->
+  <div id="map"></div>
+
+  <!-- Leaflet.js の JavaScript（地図の機能） CDN から読み込む -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+
+    // ===== 地図の初期化 =====
+    // 最初に表示する座標（愛媛県付近）とズームレベルを指定
+    const map = L.map('map').setView([33.85, 132.77], 15);
+
+    // OpenStreetMap のタイルを地図に貼り付ける（無料・登録不要）
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    console.log('地図の初期化完了');
+
+    // ===== デバイスごとのマーカーを管理するオブジェクト =====
+    // キー: deviceId、値: Leaflet のマーカーオブジェクト
+    const markers = {};
+
+    // ===== WebSocket でサーバーに接続する =====
+    const wsUrl = location.protocol === 'https:'
+      ? `wss://${location.host}`
+      : `ws://${location.host}`;
+
+    const ws = new WebSocket(wsUrl);
+    console.log('WebSocket 接続中...');
+
+    // 接続成功したとき
+    ws.onopen = () => {
+      console.log('WebSocket 接続済み');
+    };
+
+    // サーバーからメッセージ（座標）が届いたとき
+    ws.onmessage = async (event) => {
+      // Blob の場合はテキストに変換してから JSON パースする
+      const text = event.data instanceof Blob
+        ? await event.data.text()
+        : event.data;
+      const data = JSON.parse(text);
+      console.log(`座標受信: ${data.deviceName} → ${data.lat}, ${data.lng}`);
+
+      if (data.type === 'location') {
+
+        if (markers[data.deviceId]) {
+          // すでにこのデバイスのマーカーがあれば、位置を移動させる
+          markers[data.deviceId].setLatLng([data.lat, data.lng]);
+        } else {
+          // 初めてのデバイスなら新しくマーカーを作る
+          markers[data.deviceId] = L.marker([data.lat, data.lng])
+            .addTo(map)
+            .bindPopup(data.deviceName); // クリックしたらデバイス名を表示
+        }
+
+        // 地図の中心をそのデバイスの位置に移動する
+        map.setView([data.lat, data.lng]);
+      }
+    };
+
+  </script>
+
+</body>
+</html>
