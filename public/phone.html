@@ -6,21 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>GPS送信</title>
 </head>
-<body>
+<body onload="startTracking()"></body>
 
-  <h1>📡 GPS送信</h1>
+  <h1>GPS送信</h1>
 
   <!-- デバイス名の入力欄（複数スマホを区別するため） -->
   <input type="text" id="deviceName" placeholder="デバイス名（例: 田中のスマホ）">
-
-  <!-- 開始・停止ボタン -->
-  <button id="startBtn" onclick="startTracking()">送信開始</button>
-  <button id="stopBtn"  onclick="stopTracking()" style="display:none;">送信停止</button>
-
-  <!-- 状態表示エリア -->
-  <p>GPS: <span id="gpsStatus">待機中</span></p>
-  <p>サーバー: <span id="wsStatus">未接続</span></p>
-  <p>送信回数: <span id="sendCount">0</span></p>
 
   <script>
 
@@ -104,10 +95,6 @@
         }
       }, SEND_INTERVAL);
 
-      // ボタンの表示を切り替える
-      document.getElementById('startBtn').style.display = 'none';
-      document.getElementById('stopBtn').style.display  = 'inline';
-
     } 
 
     // 「送信停止」ボタンを押したときに呼ばれる
@@ -137,12 +124,7 @@
       document.getElementById('sendCount').textContent = '0';
       sendCount = 0;
       lastPosition = null;
-
-      // ボタンの表示を切り替える
-      document.getElementById('startBtn').style.display   = 'inline';
-      document.getElementById('startBtn').disabled        = false;
-      document.getElementById('stopBtn').style.display    = 'none';
-
+      
     }
 
   </script>
