@@ -46,9 +46,6 @@
         return;
       }
 
-      // ボタンを無効化（二重押し防止）
-      document.getElementById('startBtn').disabled = true;
-
       // WebSocket でサーバーに接続する
       // http → ws、https → wss に自動で切り替える
       const wsUrl = location.protocol === 'https:'
