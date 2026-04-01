@@ -20,6 +20,7 @@
     let watchId   = null; // GPS監視のID（停止するときに使う）
     let sendCount = 0;    // 送信回数のカウンター
     let lastPosition = null; // 最後に取得した位置情報を保持しておく
+    let gpsStatusText = '待機中'; // GPS状態を文字列で保持（サーバーに送るため）
 
     // 送信間隔（ミリ秒）。5000 = 5秒ごとに送信
     const SEND_INTERVAL = 5000;
@@ -54,25 +55,24 @@
         ? `wss://${location.host}`
         : `ws://${location.host}`;
 
-      document.getElementById('wsStatus').textContent = '接続中...';
       ws = new WebSocket(wsUrl);
 
       // 接続が確立したら GPS 監視を開始する（Promise で「接続完了まで待つ」）
       await new Promise((resolve, reject) => {
-        ws.onopen  = () => { document.getElementById('wsStatus').textContent = '接続済み'; resolve(); };
-        ws.onerror = () => { document.getElementById('wsStatus').textContent = '接続失敗'; reject(); };
+        ws.onopen  = () => { resolve(); };
+        ws.onerror = () => { reject(); };
       });
 
       // GPS の監視を開始する（位置が変わるたびに lastPosition を更新）
-      document.getElementById('gpsStatus').textContent = '取得中...';
+      gpsStatusText = '取得中...';
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           // 取得成功したら lastPosition に保存しておく
           lastPosition = position;
-          document.getElementById('gpsStatus').textContent = '取得成功';
+          gpsStatusText = '取得成功';
         },
         (error) => {
-          document.getElementById('gpsStatus').textContent = 'エラー: ' + error.message;
+          gpsStatusText = 'エラー: ' + error.message;
         },
         { enableHighAccuracy: true, maximumAge: 0 } // 高精度GPS・キャッシュ不使用
       );
@@ -88,10 +88,10 @@
             lat:        latitude,
             lng:        longitude,
             accuracy:   accuracy,
-            timestamp:  new Date().toISOString()
+            timestamp:  new Date().toISOString(),
+            gpsStatus:  gpsStatusText
           }));
           sendCount++;
-          document.getElementById('sendCount').textContent = sendCount;
         }
       }, SEND_INTERVAL);
 
@@ -118,10 +118,8 @@
         ws = null;
       }
 
-      // 画面の表示をリセットする
-      document.getElementById('gpsStatus').textContent = '待機中';
-      document.getElementById('wsStatus').textContent  = '未接続';
-      document.getElementById('sendCount').textContent = '0';
+      // GPS状態変数をリセットする
+      gpsStatusText = '待機中';
       sendCount = 0;
       lastPosition = null;
       

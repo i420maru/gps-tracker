@@ -14,6 +14,19 @@
 
     /* 地図を画面いっぱいに表示する */
     #map { width: 100vw; height: 100vh; }
+
+    /* 状態表示パネル。地図の左上に重ねて表示する */
+    #statusPanel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.85);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.8;
+    }
   </style>
 </head>
 <body>
@@ -21,11 +34,11 @@
   <!-- 地図を表示する div。Leaflet はここに地図を描画する -->
   <div id="map"></div>
 
-  <!-- ステータス表示エリア -->
-  <div id="statusBox" style="position:fixed; top:10px; right:10px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.3); font-size:13px; z-index:1000;">
-    <p>GPS: <span id="gpsStatus">─</span></p>
-    <p>サーバー: <span id="wsStatus">未接続</span></p>
-    <p>送信回数: <span id="sendCount">0</span></p>
+  <!-- 状態表示パネル（地図の上に重ねて表示） -->
+  <div id="statusPanel">
+    <p>サーバー: <span id="wsStatus">接続中...</span></p>
+    <p>GPS(スマホ): <span id="gpsStatus">未受信</span></p>
+    <p>受信回数: <span id="receiveCount">0</span></p>
   </div>
 
   <!-- Leaflet.js の JavaScript（地図の機能） CDN から読み込む -->
@@ -48,6 +61,9 @@
     // キー: deviceId、値: Leaflet のマーカーオブジェクト
     const markers = {};
 
+    // 受信した位置情報の回数
+    let receiveCount = 0;
+
     // ===== WebSocket でサーバーに接続する =====
     const wsUrl = location.protocol === 'https:'
       ? `wss://${location.host}`
@@ -59,6 +75,7 @@
     // 接続成功したとき
     ws.onopen = () => {
       console.log('WebSocket 接続済み');
+      document.getElementById('wsStatus').textContent = '接続済み';
     };
 
     // サーバーからメッセージ（座標）が届いたとき
@@ -84,6 +101,12 @@
 
         // 地図の中心をそのデバイスの位置に移動する
         map.setView([data.lat, data.lng]);
+
+        // GPS状態と受信回数を画面に表示する
+        document.getElementById('gpsStatus').textContent = data.gpsStatus || '不明';
+        receiveCount++;
+        document.getElementById('receiveCount').textContent = receiveCount;
+        console.log(`GPS状態: ${data.gpsStatus}, 受信回数: ${receiveCount}`);
       }
     };
 
